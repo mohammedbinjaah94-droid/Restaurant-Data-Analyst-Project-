@@ -8,7 +8,7 @@ Of course. Here is the revised and complete project summary, updated to include 
 
 This project is a comprehensive analysis of a restaurant's operational data. The goal is to extract actionable insights to improve service efficiency, optimize staff performance, and enhance customer experience. The project workflow covers data cleaning with Python, database management with PostgreSQL, and in-depth analysis using advanced SQL queries.
 
-## 🚀 Project Workflow
+##  Project Workflow
 
 The project was executed in three main stages:
 
