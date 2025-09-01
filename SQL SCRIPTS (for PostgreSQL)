@@ -1,0 +1,231 @@
+# SQL SCRIPTS (for PostgreSQL)
+# Description: These scripts are to be run in pgAdmin. They include table
+           creation, data import, and all analytical queries.
+
+
+
+-- Part 1: Table Setup & Data Import
+
+
+-- Step 1.1: Create the table structure
+CREATE TABLE orders (
+    Customer_ID INT,
+    Visit_Date DATE,
+    Visit_Time TIME,
+    Order_Type VARCHAR(50),
+    Order_Items VARCHAR(255),
+    Wait_Time_Minutes INT,
+    Service_Staff VARCHAR(50),
+    Order_Completed_Time TIME,
+    Exit_Time TIME,
+    Total_Stay_Minutes INT,
+    Payment_Method VARCHAR(50),
+    Customer_Count INT
+);
+
+-- Step 1.2: Import the cleaned data from the CSV file
+-- IMPORTANT: Replace 'YOUR_FULL_FILE_PATH' with the actual path to your file.
+COPY orders FROM 'YOUR_FULL_FILE_PATH\restaurant_data_cleaned.csv' DELIMITER ',' CSV HEADER;
+
+
+
+-- Part 2: Analytical Queries
+
+
+-- Query 1: Average, min, and max wait time for Dine-in vs. Takeaway
+SELECT
+    Order_Type,
+    AVG(Wait_Time_Minutes) AS "Average_Wait_Time",
+    MIN(Wait_Time_Minutes) AS "Minimum_Wait_Time",
+    MAX(Wait_Time_Minutes) AS "Maximum_Wait_Time"
+FROM
+    orders
+GROUP BY
+    Order_Type;
+
+-- Query 2: Busiest hours of the restaurant
+SELECT
+    EXTRACT(HOUR FROM Visit_Time) AS "Hour_of_the_Day",
+    COUNT(Customer_ID) AS "Number_of_Orders"
+FROM
+    orders
+GROUP BY
+    "Hour_of_the_Day"
+ORDER BY
+    "Number_of_Orders" DESC;
+
+-- Query 3: Staff member who handles the most orders
+SELECT
+    Service_Staff,
+    COUNT(Customer_ID) AS "Total_Orders_Handled"
+FROM
+    orders
+GROUP BY
+    Service_Staff
+ORDER BY
+    "Total_Orders_Handled" DESC;
+
+-- Query 4: Top 10 most frequently ordered items
+SELECT
+    TRIM(UNNEST(STRING_TO_ARRAY(Order_Items, ','))) AS "Menu_Item",
+    COUNT(*) AS "Total_Orders"
+FROM
+    orders
+GROUP BY
+    "Menu_Item"
+ORDER BY
+    "Total_Orders" DESC
+LIMIT 10;
+
+-- Query 5: Preferred payment method
+SELECT
+    Payment_Method,
+    COUNT(Customer_ID) AS "Number_of_Transactions"
+FROM
+    orders
+GROUP BY
+    Payment_Method
+ORDER BY
+    "Number_of_Transactions" DESC;
+
+-- Query 6: Busiest day of the week
+SELECT
+    TO_CHAR(Visit_Date, 'Day') AS "Day_of_Week",
+    COUNT(Customer_ID) AS "Number_of_Orders"
+FROM
+    orders
+GROUP BY
+    "Day_of_Week", EXTRACT(DOW FROM Visit_Date)
+ORDER BY
+    EXTRACT(DOW FROM Visit_Date);
+
+-- Query 7: Staff efficiency at turning over tables
+SELECT
+    Service_Staff,
+    AVG(EXTRACT(EPOCH FROM (Exit_Time - Order_Completed_Time))) / 60 AS "Average_Dwell_Time_Minutes"
+FROM
+    orders
+WHERE
+    Order_Type = 'Dine-in' AND Exit_Time IS NOT NULL
+GROUP BY
+    Service_Staff
+ORDER BY
+    "Average_Dwell_Time_Minutes" ASC;
+
+-- Query 8: Effect of customer group size on wait times and stay duration
+SELECT
+    Customer_Count,
+    AVG(Wait_Time_Minutes) AS "Average_Wait_Time",
+    AVG(Total_Stay_Minutes) AS "Average_Total_Stay"
+FROM
+    orders
+WHERE
+    Order_Type = 'Dine-in'
+GROUP BY
+    Customer_Count
+ORDER BY
+    Customer_Count;
+
+-- Query 9: Most popular pairs of items ordered together
+WITH items AS (
+  SELECT
+    Customer_ID,
+    TRIM(UNNEST(STRING_TO_ARRAY(Order_Items, ','))) AS item
+  FROM orders
+)
+SELECT
+    i1.item AS "Item_1",
+    i2.item AS "Item_2",
+    COUNT(*) AS "Frequency"
+FROM
+    items i1
+JOIN
+    items i2 ON i1.Customer_ID = i2.Customer_ID AND i1.item < i2.item
+GROUP BY
+    "Item_1", "Item_2"
+ORDER BY
+    "Frequency" DESC
+LIMIT 10;
+
+-- Query 10: Average service interval time for each staff member
+SELECT
+    Service_Staff,
+    AVG(EXTRACT(EPOCH FROM (Order_Completed_Time - Visit_Time))) / 60 AS "Average_Service_Interval_Minutes"
+FROM
+    orders
+GROUP BY
+    Service_Staff
+ORDER BY
+    "Average_Service_Interval_Minutes" ASC;
+
+-- Query 11: Correlation between order complexity and preparation time
+WITH OrderMetrics AS (
+    SELECT
+        Service_Staff,
+        CARDINALITY(STRING_TO_ARRAY(Order_Items, ',')) AS Number_of_Items,
+        EXTRACT(EPOCH FROM (Order_Completed_Time - Visit_Time)) / 60 AS Preparation_Time
+    FROM
+        orders
+)
+SELECT
+    Service_Staff,
+    Number_of_Items,
+    AVG(Preparation_Time) AS "Average_Preparation_Time"
+FROM
+    OrderMetrics
+GROUP BY
+    Service_Staff, Number_of_Items
+ORDER BY
+    Service_Staff, Number_of_Items;
+
+-- Query 12: Bottlenecks in the customer journey
+SELECT
+    AVG(Wait_Time_Minutes) AS "Avg_Initial_Wait_Time",
+    AVG(EXTRACT(EPOCH FROM (Order_Completed_Time - Visit_Time)) / 60) - AVG(Wait_Time_Minutes) AS "Avg_Preparation_Time",
+    AVG(EXTRACT(EPOCH FROM (Exit_Time - Order_Completed_Time)) / 60) AS "Avg_Post_Meal_Dwell_Time"
+FROM
+    orders
+WHERE
+    Order_Type = 'Dine-in';
+
+-- Query 13: How menu preferences change throughout the day
+WITH ItemSalesByTime AS (
+  SELECT
+    TRIM(UNNEST(STRING_TO_ARRAY(Order_Items, ','))) AS Menu_Item,
+    CASE
+      WHEN EXTRACT(HOUR FROM Visit_Time) BETWEEN 7 AND 11 THEN 'Morning'
+      WHEN EXTRACT(HOUR FROM Visit_Time) BETWEEN 12 AND 16 THEN 'Afternoon'
+      WHEN EXTRACT(HOUR FROM Visit_Time) BETWEEN 17 AND 21 THEN 'Evening'
+      ELSE 'Night'
+    END AS Time_Slot
+  FROM orders
+),
+RankedItems AS (
+  SELECT
+    Time_Slot,
+    Menu_Item,
+    COUNT(*) as Order_Count,
+    ROW_NUMBER() OVER(PARTITION BY Time_Slot ORDER BY COUNT(*) DESC) as Rank
+  FROM ItemSalesByTime
+  GROUP BY Time_Slot, Menu_Item
+)
+SELECT
+  Time_Slot,
+  Menu_Item,
+  Order_Count
+FROM RankedItems
+WHERE Rank <= 2;
+
+-- Query 14: Staff service consistency
+SELECT
+    Service_Staff,
+    AVG(EXTRACT(EPOCH FROM (Order_Completed_Time - Visit_Time)) / 60) AS "Average_Service_Time",
+    STDDEV(EXTRACT(EPOCH FROM (Order_Completed_Time - Visit_Time)) / 60) AS "Service_Time_Standard_Deviation"
+FROM
+    orders
+GROUP BY
+    Service_Staff
+ORDER BY
+    "Service_Time_Standard_Deviation" ASC;
+
+```
