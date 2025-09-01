@@ -1,9 +1,3 @@
-# Restaurant-Data-Analyst-Project-
-
-Of course. Here is the revised and complete project summary, updated to include all the analytical questions and with the Power BI section removed, ready for your GitHub `README.md` file.
-
------
-
 # Restaurant Performance Analysis Project
 
 This project is a comprehensive analysis of a restaurant's operational data. The goal is to extract actionable insights to improve service efficiency, optimize staff performance, and enhance customer experience. The project workflow covers data cleaning with Python, database management with PostgreSQL, and in-depth analysis using advanced SQL queries.
@@ -342,3 +336,13 @@ GROUP BY
 ORDER BY
     "Service_Time_Standard_Deviation" ASC;
 ```
+
+### **Key Analytical Insights (Summary)**
+
+* **Operations:** The restaurant is busiest on **weekend evenings (7-9 PM)**. The primary service bottleneck occurs **after the meal**, during the payment process.
+
+* **Menu:** **Pizza, Burger, and Pasta** are the top-selling items. There is a significant opportunity to create **combo meals**, as items like "Burger" and "Juice" are frequently ordered together.
+
+* **Staff:** Staff performance is multifaceted; one employee might handle the **highest volume** of orders, while another provides the most **consistent and predictable** service time.
+
+* **Customers:** Most customers prefer **digital payments (Card/Online)**. Service times are slightly longer for larger groups.
